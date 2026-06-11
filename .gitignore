@@ -39,3 +39,4 @@ samples/
 *.log
 logs/
 docs/media/.raw/
+api/.deepeval/

@@ -5,8 +5,10 @@ import { mkdirSync, renameSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 const BASE_URL = process.env.DEMO_URL ?? 'http://localhost:3000'
-const OUT_DIR = join(import.meta.dirname, '..', '..', 'docs', 'media')
+const ROOT = join(import.meta.dirname, '..', '..')
+const OUT_DIR = join(ROOT, 'docs', 'media')
 const VIDEO_DIR = join(OUT_DIR, '.raw')
+const SAMPLE = join(ROOT, 'samples', 'docs', '03-entity-resolution.md')
 
 mkdirSync(VIDEO_DIR, { recursive: true })
 
@@ -18,16 +20,24 @@ const context = await browser.newContext({
 const page = await context.newPage()
 
 await page.goto(BASE_URL, { waitUntil: 'networkidle' })
-await page.waitForSelector('text=System status')
+await page.waitForSelector('text=system status', { timeout: 15000 })
 await page.waitForTimeout(1500)
 
-// Walk the health rows so the cursor tells the story
-for (const service of ['postgres', 'qdrant', 'openai']) {
-  await page.hover(`li:has-text("${service}")`)
-  await page.waitForTimeout(900)
+// Walk the health chips so the cursor tells the story
+for (const service of ['Postgres', 'Qdrant', 'Openai']) {
+  const chip = page.locator(`text=${service}`).first()
+  await chip.hover().catch(() => {})
+  await page.waitForTimeout(700)
 }
-await page.hover('button:has-text("Upload documents")')
-await page.waitForTimeout(1500)
+
+// Upload a sample through the real input and watch ingestion progress
+const input = page.locator('input[type="file"]').first()
+await input.setInputFiles(SAMPLE)
+await page.waitForTimeout(2000) // toast + Ingesting badge
+await page
+  .waitForSelector('text=Ready', { timeout: 90000 })
+  .catch(() => console.warn('ingestion did not reach Ready in time — recording anyway'))
+await page.waitForTimeout(2000)
 
 await context.close() // flushes the video
 await browser.close()
