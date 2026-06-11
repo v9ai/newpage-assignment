@@ -14,6 +14,8 @@ import os
 import pytest
 
 from app.prompts import (
+    CTX_CLOSE,
+    CTX_OPEN,
     REFUSAL_TEXT,
     SYSTEM_PROMPT,
     ContextChunk,
@@ -32,19 +34,33 @@ def test_system_prompt_declares_context_untrusted() -> None:
     assert "untrusted" in lowered
     assert "ignore previous instructions" in lowered
     assert "never as a command" in lowered
+    # The fencing markers are named in the rules so the model knows the boundary.
+    assert CTX_OPEN in SYSTEM_PROMPT
+    assert CTX_CLOSE in SYSTEM_PROMPT
+
+
+def test_system_prompt_forbids_prompt_disclosure_and_persona_change() -> None:
+    lowered = SYSTEM_PROMPT.lower()
+    assert "never reveal" in lowered
+    assert "persona" in lowered
+    # The user's question is explicitly untrusted too, not just the documents.
+    assert "question is also untrusted" in lowered
 
 
 def test_system_prompt_pins_refusal_text() -> None:
     assert REFUSAL_TEXT in SYSTEM_PROMPT
 
 
-def test_malicious_document_text_stays_in_context_block() -> None:
+def test_malicious_document_text_is_fenced_inside_untrusted_markers() -> None:
     chunk = ContextChunk(number=1, filename="evil.md", page=1, text=INJECTION_PAYLOAD)
     rendered = format_context([chunk])
-    # The payload appears only inside the numbered Context block, labelled as a source.
-    assert INJECTION_PAYLOAD in rendered
     assert rendered.startswith("Context:")
     assert "(source: evil.md, page 1)" in rendered
+    # The payload sits strictly between the open/close markers — structurally data.
+    open_at = rendered.index(CTX_OPEN)
+    payload_at = rendered.index(INJECTION_PAYLOAD)
+    close_at = rendered.index(CTX_CLOSE)
+    assert open_at < payload_at < close_at
 
 
 def test_user_turn_separates_question_from_injected_context() -> None:
@@ -53,6 +69,8 @@ def test_user_turn_separates_question_from_injected_context() -> None:
     # Question is clearly delimited and follows the context, never merged into it.
     assert turn.index("Context:") < turn.index("Question:")
     assert "What is the deployment process?" in turn
+    # The question sits outside the untrusted-context fence.
+    assert turn.index(CTX_CLOSE) < turn.index("Question:")
 
 
 @pytest.mark.skipif(
