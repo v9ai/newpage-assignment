@@ -5,12 +5,14 @@ from typing import Any
 import structlog
 from fastapi import FastAPI
 
+from app.chat import get_persistence
 from app.chat import router as chat_router
 from app.config import get_settings, require_api_key
 from app.documents import router as documents_router
 from app.logging import configure_logging
 from app.middleware import RequestContextMiddleware
 from app.retrieval import router as retrieval_router
+from app.sessions import get_db_persistence
 from app.sessions import router as sessions_router
 from app.vectorstore import ensure_collection
 
@@ -44,6 +46,9 @@ app.include_router(documents_router)
 app.include_router(retrieval_router)
 app.include_router(chat_router)
 app.include_router(sessions_router)
+# Chat turns are persisted to Postgres (unit 08); chat.py ships an in-memory
+# stub only for pre-integration development.
+app.dependency_overrides[get_persistence] = get_db_persistence
 
 
 def _probe(name: str, check: Any) -> str:
