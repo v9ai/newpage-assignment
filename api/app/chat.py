@@ -26,6 +26,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.config import Settings, get_settings
 from app.prompts import REFUSAL_TEXT, SYSTEM_PROMPT, ContextChunk, build_user_turn
+from app.ratelimit import enforce_chat_rate_limit
 from app.retrieval import RetrievedNode, search
 
 log = structlog.get_logger()
@@ -107,10 +108,16 @@ def _stub_persistence() -> InMemoryPersistence:
 def get_persistence() -> ChatPersistence:
     """FastAPI dependency for the persistence layer.
 
-    Unit 08 overrides this (via app.dependency_overrides or by reassigning the
-    provider) with its DB-backed implementation.
+    Returns unit 08's Postgres-backed DbChatPersistence (which satisfies the
+    ChatPersistence Protocol and persists messages + citations). Falls back to
+    the in-memory stub only if the sessions module is unavailable, so the chat
+    engine still streams in isolation (e.g. unit tests of this module alone).
     """
-    return _stub_persistence()
+    try:
+        from app.sessions import get_db_persistence
+    except Exception:
+        return _stub_persistence()
+    return get_db_persistence()
 
 
 # --- Model / citation plumbing -------------------------------------------------
@@ -171,10 +178,23 @@ async def stream_answer(
 
     from llama_index.core.llms import ChatMessage, MessageRole
 
-    messages = [
-        ChatMessage(role=MessageRole.SYSTEM, content=SYSTEM_PROMPT),
-        ChatMessage(role=MessageRole.USER, content=build_user_turn(question, chunks)),
-    ]
+    # Prior turns for multi-turn context. post_message persists the current user
+    # message *before* streaming, so session_history()'s last entry is this same
+    # turn — drop it here and re-add it below with its retrieved context attached.
+    # session_history already applies the token-budget condensation (unit 08).
+    role_map = {"user": MessageRole.USER, "assistant": MessageRole.ASSISTANT}
+    history = persistence.session_history(session_id)
+    if history and history[-1][0] == "user" and history[-1][1].strip() == question:
+        history = history[:-1]
+
+    messages = [ChatMessage(role=MessageRole.SYSTEM, content=SYSTEM_PROMPT)]
+    for role, content in history:
+        messages.append(
+            ChatMessage(role=role_map.get(role, MessageRole.USER), content=content)
+        )
+    messages.append(
+        ChatMessage(role=MessageRole.USER, content=build_user_turn(question, chunks))
+    )
 
     parts: list[str] = []
     try:
@@ -210,13 +230,19 @@ async def stream_answer(
     yield _sse("done", {"message_id": message_id, "usage": usage})
 
 
-@router.post("/sessions/{session_id}/messages")
+@router.post(
+    "/sessions/{session_id}/messages",
+    dependencies=[Depends(enforce_chat_rate_limit)],
+)
 async def post_message(
     session_id: str,
     body: MessageIn,
     persistence: Annotated[ChatPersistence, Depends(get_persistence)],
 ) -> EventSourceResponse:
-    """Accept a user message and stream the grounded answer as SSE."""
+    """Accept a user message and stream the grounded answer as SSE.
+
+    Rate-limited per client via enforce_chat_rate_limit (429 when exceeded).
+    """
     question = body.content.strip()
     if not question:
         raise HTTPException(status_code=422, detail="Message content is empty.")

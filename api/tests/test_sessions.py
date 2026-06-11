@@ -46,7 +46,9 @@ def client(engine, monkeypatch) -> Iterator[TestClient]:
     app.dependency_overrides[get_session] = override
     with TestClient(app) as c:
         yield c
-    app.dependency_overrides.clear()
+    # Pop only what this fixture set — clear() would also strip main.py's
+    # production wiring (chat get_persistence -> DB) for later tests.
+    app.dependency_overrides.pop(get_session, None)
     get_settings.cache_clear()
 
 
@@ -134,3 +136,53 @@ def test_get_session_with_messages_relationship(engine):
         assert fetched is not None
         assert len(fetched.messages) == 1
         assert fetched.messages[0].content == "hello"
+
+
+def test_db_persistence_round_trip(client, engine, monkeypatch):
+    """DbChatPersistence (what the chat engine calls) persists a full turn that
+    the session API then reads back — i.e. a browser reload restores it."""
+    from app.sessions import DbChatPersistence
+
+    # DbChatPersistence opens its own Session via get_engine(); point it at the
+    # test engine (patch both the source and the name imported into sessions).
+    monkeypatch.setattr("app.db.get_engine", lambda: engine)
+    monkeypatch.setattr("app.sessions.get_engine", lambda: engine)
+
+    session_id = client.post("/api/sessions", json={}).json()["id"]
+    persistence = DbChatPersistence()
+
+    # Mirror the SSE endpoint: record the user turn, then the assistant turn.
+    user_mid = persistence.add_user_message(str(session_id), "What about revenue?")
+    citations = [
+        {
+            "doc_id": "1",
+            "filename": "q3.pdf",
+            "page": 4,
+            "chunk_index": 2,
+            "snippet": "Revenue rose 23%.",
+        }
+    ]
+    asst_mid = persistence.add_assistant_message(
+        str(session_id), "Revenue rose 23% YoY.", citations
+    )
+    assert user_mid != asst_mid  # distinct message ids (the done event's id)
+
+    # History (condensed) reads back in order.
+    history = persistence.session_history(str(session_id))
+    assert ("user", "What about revenue?") in history
+    assert ("assistant", "Revenue rose 23% YoY.") in history
+
+    # And the session API returns the persisted turn with its citations.
+    detail = client.get(f"/api/sessions/{session_id}").json()
+    assert [m["role"] for m in detail["messages"]] == ["user", "assistant"]
+    assert detail["messages"][1]["citations"][0]["filename"] == "q3.pdf"
+
+
+def test_db_persistence_unknown_session_raises_keyerror(engine, monkeypatch):
+    from app.sessions import DbChatPersistence
+
+    monkeypatch.setattr("app.sessions.get_engine", lambda: engine)
+    persistence = DbChatPersistence()
+    # The chat endpoint maps this KeyError to a 404.
+    with pytest.raises(KeyError):
+        persistence.add_user_message("999999", "hi")
