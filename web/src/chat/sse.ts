@@ -15,7 +15,9 @@ const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 function parseFrame(frame: string): ChatEvent | null {
   let event = 'message'
   const dataLines: string[] = []
-  for (const line of frame.split('\n')) {
+  // Frames may use CRLF (sse-starlette) or LF line endings; normalize.
+  for (const raw of frame.split('\n')) {
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
     if (line.startsWith('event:')) event = line.slice(6).trim()
     else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
   }
@@ -88,8 +90,8 @@ export function streamMessage(
       for (;;) {
         const { done, value } = await reader.read()
         if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        // SSE frames are separated by a blank line.
+        // Normalize CRLF→LF so the blank-line frame separator is always "\n\n".
+        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
         let sep: number
         while ((sep = buffer.indexOf('\n\n')) !== -1) {
           const frame = buffer.slice(0, sep)

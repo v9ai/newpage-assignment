@@ -7,6 +7,29 @@ import type { Citation, ChatMessage, SessionSummary } from './types'
 let localId = 0
 const nextLocalId = () => `local-${++localId}`
 
+// Remember which session the user was last in so a reload returns there, rather
+// than guessing the newest (which may be an empty session created elsewhere).
+const LAST_SESSION_KEY = 'docchat:last-session'
+
+function readLastSession(): number | null {
+  try {
+    const raw = localStorage.getItem(LAST_SESSION_KEY)
+    const n = raw == null ? NaN : Number(raw)
+    return Number.isInteger(n) ? n : null
+  } catch {
+    return null
+  }
+}
+
+function writeLastSession(id: number | null): void {
+  try {
+    if (id == null) localStorage.removeItem(LAST_SESSION_KEY)
+    else localStorage.setItem(LAST_SESSION_KEY, String(id))
+  } catch {
+    // localStorage unavailable (private mode) — fall back to newest-session.
+  }
+}
+
 interface UseChat {
   sessions: SessionSummary[]
   activeId: number | null
@@ -41,7 +64,14 @@ export function useChat(): UseChat {
         if (cancelled) return
         setSessions(list)
         setSessionsError(null)
-        if (list.length > 0) setActiveId((cur) => cur ?? list[0].id)
+        if (list.length > 0) {
+          // Restore the last-active session if it still exists; otherwise the
+          // most recent. (Avoids landing on a newer empty session.)
+          const last = readLastSession()
+          const restore =
+            last != null && list.some((s) => s.id === last) ? last : list[0].id
+          setActiveId((cur) => cur ?? restore)
+        }
       })
       .catch((e) => {
         if (cancelled) return
@@ -79,6 +109,11 @@ export function useChat(): UseChat {
     }
   }, [activeId])
 
+  // Persist the active session so a reload returns to it.
+  useEffect(() => {
+    if (activeId != null) writeLastSession(activeId)
+  }, [activeId])
+
   // Abort any in-flight stream on unmount.
   useEffect(() => () => stream.current?.cancel(), [])
 
@@ -100,10 +135,11 @@ export function useChat(): UseChat {
       const text = content.trim()
       if (!text || streaming) return
 
-      // Ensure a session exists.
+      // Ensure a session exists. A fresh session is titled from the first
+      // question so the title persists server-side (a reload shows it too).
       let sessionId = activeId
       if (sessionId == null) {
-        const created = await sessionsApi.createSession()
+        const created = await sessionsApi.createSession(text.slice(0, 60))
         setSessions((prev) => [created, ...prev])
         setActiveId(created.id)
         sessionId = created.id
