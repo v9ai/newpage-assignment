@@ -3,14 +3,16 @@ import { useDocuments } from './hooks/useDocuments'
 import { HealthBadge } from './components/HealthBadge'
 import { UploadZone } from './components/UploadZone'
 import { DocumentList } from './components/DocumentList'
+import { ChatPanel } from './chat/ChatPanel'
 
 export default function App() {
   const { documents, loading, error, refresh } = useDocuments()
+  const hasDocuments = !!documents && documents.length > 0
 
   return (
     <div className="min-h-screen">
       <header className="border-b border-border/70 bg-surface-card/60 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2.5">
             <span
               className="grid size-8 place-items-center rounded-lg bg-accent text-white shadow-card"
@@ -41,36 +43,38 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-3xl flex-col gap-8 px-6 py-10">
-        <section className="animate-rise text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <section className="animate-rise mb-8 text-center lg:text-left">
+          <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
             Ask questions about your documents
           </h1>
-          <p className="mx-auto mt-3 max-w-xl text-ink-muted">
+          <p className="mt-2 text-ink-muted">
             Upload PDFs, text, or Markdown and get grounded answers with citations
             back to the source passage.
           </p>
         </section>
 
-        <div className="animate-rise" style={{ animationDelay: '40ms' }}>
-          <HealthBadge />
-        </div>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+          {/* Documents column */}
+          <div className="animate-rise flex flex-col gap-6" style={{ animationDelay: '40ms' }}>
+            <HealthBadge />
+            <UploadZone onUploaded={refresh} />
+            <DocumentList
+              documents={documents}
+              loading={loading}
+              error={error}
+              onChanged={refresh}
+            />
+          </div>
 
-        <div className="animate-rise" style={{ animationDelay: '80ms' }}>
-          <UploadZone onUploaded={refresh} />
-        </div>
-
-        <div className="animate-rise" style={{ animationDelay: '120ms' }}>
-          <DocumentList
-            documents={documents}
-            loading={loading}
-            error={error}
-            onChanged={refresh}
-          />
+          {/* Chat column */}
+          <div className="animate-rise" style={{ animationDelay: '100ms' }}>
+            <ChatPanel hasDocuments={hasDocuments} />
+          </div>
         </div>
       </main>
 
-      <footer className="mx-auto max-w-3xl px-6 pb-10 text-center text-xs text-ink-faint">
+      <footer className="mx-auto max-w-6xl px-6 pb-10 text-center text-xs text-ink-faint">
         DocChat · retrieval-augmented document chat
       </footer>
     </div>
