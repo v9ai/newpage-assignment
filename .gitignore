@@ -1,0 +1,41 @@
+# Secrets — never commit; .env.example is the only env file that belongs in git
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Local data / docker volumes (if bind-mounted into repo)
+data/
+volumes/
+*.db
+
+# Sample ingestion corpus (fetched via `make fetch-samples`, never vendored)
+samples/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
+logs/
+docs/media/.raw/
