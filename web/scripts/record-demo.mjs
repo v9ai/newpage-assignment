@@ -78,8 +78,8 @@ await page
 await page.waitForTimeout(1500)
 
 // Ask a question about the uploaded doc and let the cited answer stream in.
-// Citation chips arrive with the stream's final `citations` event, so waiting
-// for one means the turn finished — no blind 30s pause.
+// Citation chips arrive with the stream's final `citations` event, so a chip
+// on screen means the turn finished.
 const composer = page.locator('textarea, input[type="text"]').last()
 await composer.fill(QUESTION)
 await composer.press('Enter')
@@ -96,7 +96,7 @@ await page.keyboard.press('Escape')
 await page.waitForTimeout(1000)
 
 // Follow-up question in the same session — multi-turn history on screen.
-// :has-text() is Playwright-only (not valid in querySelectorAll), so poll the locator.
+// Polled, since :has-text() can't run inside waitForFunction.
 const chipsBefore = await page.locator(CHIP_SELECTOR).count()
 await composer.fill(FOLLOW_UP)
 await composer.press('Enter')
@@ -119,8 +119,8 @@ await page.waitForTimeout(1500)
 await page.locator(CHIP_SELECTOR).last().hover().catch(() => {})
 await page.waitForTimeout(2000)
 
-// saveAs() copies whatever file the recorder actually wrote — video.path() can
-// drift from the on-disk name if the encoder restarts mid-run.
+// saveAs() follows the file the recorder actually wrote, even if the encoder
+// restarted mid-run and video.path() points elsewhere.
 await context.close() // flushes the video
 await video.saveAs(join(OUT_DIR, 'demo.webm'))
 await browser.close()
