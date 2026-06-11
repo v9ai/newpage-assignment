@@ -6,6 +6,7 @@ import structlog
 from fastapi import FastAPI
 
 from app.config import get_settings, require_api_key
+from app.documents import router as documents_router
 
 log = structlog.get_logger()
 
@@ -17,6 +18,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="DocChat API", version=get_settings().version, lifespan=lifespan)
+app.include_router(documents_router)
 
 
 def _probe(name: str, check: Any) -> str:

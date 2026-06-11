@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     qdrant_url: str = "http://localhost:6333"
     qdrant_collection: str = "docchat_chunks"
 
+    upload_dir: str = "./data/uploads"
+    max_upload_mb: int = 25
+
 
 @lru_cache
 def get_settings() -> Settings:
