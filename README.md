@@ -27,7 +27,7 @@ Want a demo corpus to upload? `make fetch-samples` pulls a set of architecture d
 `samples/docs/`.
 
 > Deployment target is **localhost via docker compose** — that is the entire run story.
-> [Productionization](#3-productionization-awsgcpazurecloudflare) is discussed below, not implemented.
+> [Productionization](#3-productionization-aws--gcp--azure--cloudflare) is discussed below, not implemented.
 
 ### Troubleshooting
 
