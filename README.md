@@ -6,7 +6,7 @@ Built for the Newpage Solutions fullstack AI take-home (Option 1: Chat With Your
 
 ## Demo
 
-![DocChat demo — upload, ingestion, and a cited streamed answer](docs/media/demo.gif)
+![DocChat demo — rejected upload, ingestion, cited streamed answers across two turns, and the conversation surviving a reload](docs/media/demo.gif)
 
 <sup>Recorded with Playwright against the running stack (`make video` re-records it —
 video file: [docs/media/demo.mp4](docs/media/demo.mp4)). Updated as features land.</sup>
