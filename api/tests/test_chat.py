@@ -40,8 +40,10 @@ async def _fake_stream(deltas: list[str]) -> AsyncIterator[_FakeChunk]:
 class _FakeLLM:
     def __init__(self, deltas: list[str]) -> None:
         self._deltas = deltas
+        self.seen_messages: list = []  # messages from the last astream_chat call
 
-    async def astream_chat(self, _messages: object) -> AsyncIterator[_FakeChunk]:
+    async def astream_chat(self, messages: object) -> AsyncIterator[_FakeChunk]:
+        self.seen_messages = list(messages)  # type: ignore[arg-type]
         return _fake_stream(self._deltas)
 
 
@@ -167,3 +169,54 @@ def test_message_endpoint_rejects_oversized_content() -> None:
     )
     assert resp.status_code == 413
     assert "limit" in resp.json()["detail"].lower()
+
+
+# --- multi-turn history --------------------------------------------------------
+
+
+def test_prior_history_is_included_in_the_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(chat, "search", lambda *a, **k: [_node("ctx")])
+    fake = _FakeLLM(["ok [1]"])
+    monkeypatch.setattr(chat, "get_llm", lambda _s: fake)
+
+    persistence = InMemoryPersistence()
+    persistence.add_user_message("s", "What stores does it use?")
+    persistence.add_assistant_message("s", "SQLite, LanceDB, ChromaDB [1].", [])
+
+    events = _collect(stream_answer("s", "And which is the vector store?", persistence))
+    assert events[-1][0] == "done"
+
+    # System prompt + 2 prior turns + current grounded user turn = 4 messages.
+    contents = [m.content for m in fake.seen_messages]
+    assert any("What stores does it use?" in c for c in contents)
+    assert any("SQLite, LanceDB, ChromaDB" in c for c in contents)
+    assert any("And which is the vector store?" in c for c in contents)
+    assert len(fake.seen_messages) == 4
+
+
+def test_current_user_turn_not_duplicated_from_history(monkeypatch: pytest.MonkeyPatch) -> None:
+    # When the current message was already persisted (as post_message does), it
+    # must not appear twice — once from history and once as the grounded turn.
+    monkeypatch.setattr(chat, "search", lambda *a, **k: [_node("ctx")])
+    fake = _FakeLLM(["ok [1]"])
+    monkeypatch.setattr(chat, "get_llm", lambda _s: fake)
+
+    persistence = InMemoryPersistence()
+    persistence.add_user_message("s", "only question")  # mimic post_message persisting first
+
+    _collect(stream_answer("s", "only question", persistence))
+    # Just system prompt + the single grounded user turn — the persisted copy is dropped.
+    assert len(fake.seen_messages) == 2
+
+
+def test_rate_limit_dependency_is_wired() -> None:
+    from app.chat import enforce_chat_rate_limit
+    from app.main import app
+
+    route = next(
+        r
+        for r in app.routes
+        if getattr(r, "path", None) == "/api/sessions/{session_id}/messages"
+    )
+    dep_calls = [d.call for d in route.dependant.dependencies]
+    assert enforce_chat_rate_limit in dep_calls
