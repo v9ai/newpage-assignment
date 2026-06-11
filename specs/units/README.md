@@ -68,7 +68,7 @@ Collection `QDRANT_COLLECTION`, 384-dim cosine vectors; point payload:
 `{ doc_id, filename, page, chunk_index, text }`. Re-ingest deletes by `doc_id` filter first.
 
 ### HTTP API (`/api/*`, same-origin via nginx proxy in compose)
-- `GET /api/health` → `{ ok, version, postgres: "ok"|"error", qdrant: "ok"|"error", openai: "configured"|"missing" }`
+- `GET /api/health` → `{ ok, version, services: { postgres: "ok"|"error", qdrant: "ok"|"error", openai: "configured"|"missing" } }`
 - `POST /api/documents` (multipart; pdf/txt/md) → `DocumentOut` · `GET /api/documents` → `[DocumentOut]` · `DELETE /api/documents/{id}` → 204
   - `DocumentOut = { id, filename, size, mime, status, failure_reason, created_at }`
   - Rejections: 415 unsupported type, 413 oversized — JSON body `{ detail }`
