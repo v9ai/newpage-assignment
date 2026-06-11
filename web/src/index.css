@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* DocChat design tokens */
+@theme {
+  --color-ink: #0f172a;
+  --color-ink-muted: #475569;
+  --color-surface: #f8fafc;
+  --color-surface-card: #ffffff;
+  --color-accent: #2563eb;
+  --color-accent-soft: #dbeafe;
+  --color-ok: #16a34a;
+  --color-err: #dc2626;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  @apply bg-surface text-ink font-sans antialiased;
+}
