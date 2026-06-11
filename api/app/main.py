@@ -11,6 +11,7 @@ from app.documents import router as documents_router
 from app.logging import configure_logging
 from app.middleware import RequestContextMiddleware
 from app.retrieval import router as retrieval_router
+from app.sessions import router as sessions_router
 from app.vectorstore import ensure_collection
 
 log = structlog.get_logger()
@@ -42,6 +43,7 @@ app.add_middleware(RequestContextMiddleware)
 app.include_router(documents_router)
 app.include_router(retrieval_router)
 app.include_router(chat_router)
+app.include_router(sessions_router)
 
 
 def _probe(name: str, check: Any) -> str:
