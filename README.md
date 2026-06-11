@@ -6,10 +6,10 @@ Built for the Newpage Solutions fullstack AI take-home (Option 1: Chat With Your
 
 ## Demo
 
-![DocChat demo — landing page with live service health](docs/media/demo.gif)
+![DocChat demo — upload, ingestion, and a cited streamed answer](docs/media/demo.gif)
 
 <sup>Recorded with Playwright against the running stack (`make video` re-records it —
-source clip: [docs/media/demo.webm](docs/media/demo.webm)). Updated as features land.</sup>
+video file: [docs/media/demo.mp4](docs/media/demo.mp4)). Updated as features land.</sup>
 
 ## Quick start
 
@@ -278,12 +278,19 @@ make e2e         # Playwright end-to-end against the running compose stack
 
 Frontend dev server: `cd web && npm run dev` (Vite on :5173, proxies `/api` to :8000).
 
+**Failure-mode sweep.** With the stack up, `RUN_OUTAGE_SWEEP=1 make e2e` runs a destructive
+hardening pass that stops each backing service (Qdrant, Postgres) in turn and asserts the api
+degrades to a designed, correlated error — `/api/health` stays 200 and flags the downed
+dependency as `error`, and dependent endpoints return clean JSON (`{detail, request_id}`), never
+a raw 500 or a blank screen. Each service is restored afterward. It is opt-in (off by default)
+because it interrupts the running stack.
+
 ## Project layout
 
 ```
 api/      FastAPI backend (app/, alembic/, tests/)
 web/      React + Vite + TS + Tailwind SPA, nginx config + Dockerfile
-e2e/      Playwright end-to-end test
+e2e/      Playwright + API end-to-end: happy path, failure modes, opt-in outage sweep
 specs/    The spec-first build: roadmap, tech stack, and the 10 build units
 docs/     Screenshots and demo media
 docker-compose.yml   The whole stack: web · api · postgres · qdrant

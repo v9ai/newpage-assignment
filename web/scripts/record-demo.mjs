@@ -37,7 +37,20 @@ await page.waitForTimeout(2000) // toast + Ingesting badge
 await page
   .waitForSelector('text=Ready', { timeout: 90000 })
   .catch(() => console.warn('ingestion did not reach Ready in time — recording anyway'))
-await page.waitForTimeout(2000)
+await page.waitForTimeout(1500)
+
+// Ask a question about the uploaded doc and let the cited answer stream in
+const composer = page.locator('textarea, input[type="text"]').last()
+await composer.fill('How does entity resolution decide when two records are the same company?')
+await composer.press('Enter')
+await page.waitForTimeout(30000) // token stream + citations
+const chip = page.locator('button:has-text("entity-resolution")').last()
+await chip.hover().catch(() => {})
+await page.waitForTimeout(1500)
+await chip.click().catch(() => {})
+await page.waitForTimeout(2500) // source preview open
+await page.keyboard.press('Escape')
+await page.waitForTimeout(1000)
 
 await context.close() // flushes the video
 await browser.close()

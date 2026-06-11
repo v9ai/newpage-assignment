@@ -41,4 +41,6 @@ e2e:
 video:
 	cd web && node scripts/record-demo.mjs
 	ffmpeg -y -i docs/media/demo.webm -vf "fps=12,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" -loop 0 docs/media/demo.gif
+	ffmpeg -y -i docs/media/demo.webm -c:v libx264 -pix_fmt yuv420p -movflags +faststart docs/media/demo.mp4
+	rm docs/media/demo.webm
 	@ls -lh docs/media/
