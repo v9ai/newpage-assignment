@@ -42,7 +42,15 @@ def stored_path(doc_id: int, filename: str) -> Path:
     return Path(get_settings().upload_dir) / f"{doc_id}{ext}"
 
 
-@router.post("", status_code=201, response_model=DocumentOut)
+@router.post(
+    "",
+    status_code=201,
+    response_model=DocumentOut,
+    responses={
+        413: {"description": "File exceeds the upload size limit"},
+        415: {"description": "Unsupported file type (allowed: pdf, txt, md)"},
+    },
+)
 def upload_document(
     file: UploadFile,
     background: BackgroundTasks,
@@ -92,7 +100,11 @@ def list_documents(session: Annotated[Session, Depends(get_session)]) -> list[Do
     return list(session.scalars(select(Document).order_by(Document.created_at.desc())))
 
 
-@router.delete("/{doc_id}", status_code=204)
+@router.delete(
+    "/{doc_id}",
+    status_code=204,
+    responses={404: {"description": "Document not found"}},
+)
 def delete_document(doc_id: int, session: Annotated[Session, Depends(get_session)]) -> None:
     doc = session.get(Document, doc_id)
     if doc is None:
