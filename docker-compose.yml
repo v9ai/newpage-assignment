@@ -17,8 +17,12 @@ services:
       DATABASE_URL: postgresql+psycopg://docchat:docchat@postgres:5432/docchat
       QDRANT_URL: http://qdrant:6333
       UPLOAD_DIR: /app/data/uploads
+      # FastEmbed downloads the ONNX model on first use; cache it on a volume
+      # so restarts don't re-fetch ~80MB from HuggingFace every time.
+      FASTEMBED_CACHE_PATH: /app/data/fastembed
     volumes:
       - uploads:/app/data/uploads
+      - fastembed_cache:/app/data/fastembed
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,3 +54,4 @@ volumes:
   pgdata:
   qdrant_storage:
   uploads:
+  fastembed_cache:
