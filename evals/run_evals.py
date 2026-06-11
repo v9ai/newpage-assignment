@@ -235,14 +235,20 @@ def run_llamaindex_layer(records: list[AnswerRecord]) -> None:
     )
 
     citation_guideline = (
-        "The answer must support factual claims with an inline bracketed citation "
-        "like [1], OR clearly state that the documents do not contain the answer."
+        "The answer must support its factual claims with at least one inline "
+        "bracketed citation like [1], OR clearly state that the documents do not "
+        "contain the answer. Minor stylistic issues are acceptable; judge only "
+        "whether sources are cited at all."
     )
     refusal_guideline = (
-        "If the provided context is insufficient to answer, the response must "
-        "decline rather than guess."
+        "The response must decline to answer — stating the documents do not "
+        "contain the information — rather than guessing or fabricating an answer."
     )
 
+    # The graded-on-a-scale evaluators apply to every record; the two guideline
+    # checks are scoped (citation → answerable, refusal → unanswerable) because a
+    # refusal guideline is a category error on an answerable question and vice
+    # versa. Run the shared set once, then the guidelines on their subsets.
     evaluators = {
         "faithfulness": FaithfulnessEvaluator(),
         "relevancy": RelevancyEvaluator(),
@@ -250,22 +256,15 @@ def run_llamaindex_layer(records: list[AnswerRecord]) -> None:
         "context_relevancy": ContextRelevancyEvaluator(),
         "correctness": CorrectnessEvaluator(),
         "semantic_similarity": SemanticSimilarityEvaluator(),
-        "guideline_citation": GuidelineEvaluator(guidelines=citation_guideline),
-        "guideline_refusal": GuidelineEvaluator(guidelines=refusal_guideline),
     }
     runner = BatchEvalRunner(evaluators, workers=4, show_progress=False)
 
-    queries = [r.item.question for r in records]
-    responses = [r.answer for r in records]
-    contexts = [r.contexts for r in records]
-    references = [r.item.reference_answer for r in records]
-
     results = asyncio.run(
         runner.aevaluate_response_strs(
-            queries=queries,
-            response_strs=responses,
-            contexts_list=contexts,
-            reference=references,
+            queries=[r.item.question for r in records],
+            response_strs=[r.answer for r in records],
+            contexts_list=[r.contexts for r in records],
+            reference=[r.item.reference_answer for r in records],
         )
     )
 
@@ -277,6 +276,33 @@ def run_llamaindex_layer(records: list[AnswerRecord]) -> None:
             if score is None:
                 score = 1.0 if res.passing else 0.0
             rec.scores[name] = float(score)
+
+    _score_guideline(
+        [r for r in records if r.item.answerable],
+        "guideline_citation",
+        GuidelineEvaluator(guidelines=citation_guideline),
+    )
+    _score_guideline(
+        [r for r in records if not r.item.answerable],
+        "guideline_refusal",
+        GuidelineEvaluator(guidelines=refusal_guideline),
+    )
+
+
+def _score_guideline(records: list[AnswerRecord], key: str, evaluator: Any) -> None:
+    """Run one GuidelineEvaluator over a subset; store pass(1)/fail(0) per record."""
+    import asyncio
+
+    async def _run() -> None:
+        for rec in records:
+            res = await evaluator.aevaluate(
+                query=rec.item.question,
+                response=rec.answer,
+                contexts=rec.contexts or [""],
+            )
+            rec.scores[key] = 1.0 if res.passing else 0.0
+
+    asyncio.run(_run())
 
 
 def run_retriever_metrics(collection: str, items: list[GoldenItem]) -> dict[str, float]:
@@ -395,16 +421,22 @@ def print_report(
     print("\n" + "-" * 100)
     print("AGGREGATES vs THRESHOLDS")
     print("-" * 100)
+    print("  (guideline_refusal is scored over unanswerable questions; all other")
+    print("   metrics over the questions that received them)")
     all_pass = True
     for k in present:
-        vals = [r.scores[k] for r in answerable if k in r.scores]
+        # Average each metric over exactly the records that carry it — the
+        # refusal guideline lives on unanswerable rows, everything else on the
+        # answered rows — rather than forcing one population on all of them.
+        vals = [r.scores[k] for r in records if k in r.scores]
         if not vals:
             continue
         mean = sum(vals) / len(vals)
         thr = THRESHOLDS[k]
         ok = mean >= thr
         all_pass = all_pass and ok
-        print(f"  {k:<28} mean={mean:5.2f}  threshold={thr:4.2f}  {'PASS' if ok else 'FAIL'}")
+        n = len(vals)
+        print(f"  {k:<28} mean={mean:5.2f}  threshold={thr:4.2f}  (n={n:>2})  {'PASS' if ok else 'FAIL'}")
 
     for k in ("hit_rate", "mrr"):
         v = retrieval_metrics.get(k, 0.0)
