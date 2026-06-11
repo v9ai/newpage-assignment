@@ -52,12 +52,11 @@ export function useChat(): UseChat {
     }
   }, [])
 
-  // Load the active session's messages whenever it changes.
+  // Load the active session's messages whenever it changes. (When activeId is
+  // null there is nothing to load; messages are cleared by the callbacks that
+  // set it null, so the effect simply no-ops.)
   useEffect(() => {
-    if (activeId == null) {
-      setMessages([])
-      return
-    }
+    if (activeId == null) return
     let cancelled = false
     sessionsApi
       .getSession(activeId)

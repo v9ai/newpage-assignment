@@ -10,7 +10,7 @@ const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 
 // ── Mock store ──────────────────────────────────────────────────────────────
 
-interface MockSession extends SessionDetail {}
+type MockSession = SessionDetail
 let mockSeq = 1
 const mockSessions = new Map<number, MockSession>()
 
