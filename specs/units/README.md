@@ -152,6 +152,19 @@ checkpoints (make typecheck lint test; docker compose up --build; make e2e) as i
 tasks unblock. Only approve plans that respect the file-ownership table.
 ```
 
+### Project agents & skills (the executable side of this spec)
+
+The repo ships Claude Code agents (`.claude/agents/`) and skills (`.claude/skills/`) that
+turn this spec's gates into runnable procedures. Use them instead of improvising:
+
+| Tool | Kind | When in the workflow |
+|---|---|---|
+| `contract-guardian` | agent | Review BEFORE any change to the shared-contracts section above (payload shape, HTTP surface, SSE protocol, env vars, schema). Catches silent drift like the health-shape mismatch. |
+| `spec-auditor` | agent | Audit a unit against its done-when checklist before marking its task complete; audit the board before a checkpoint. |
+| `verify-stack` | skill | Executes Checkpoints B and C: compose up → health → upload → ready → retrieve → cited answer → refusal. |
+| `rag-eval` | skill | Executes unit 09's gate and Checkpoint D's eval leg: `make eval` + injection suite, scored against the documented thresholds. Costs OpenAI tokens. |
+| `submission-check` | skill | Executes Checkpoint D's final leg: audit against assignment.md's "What to Submit" before handing in. |
+
 ### Integration checkpoints (lead-run, in dependency order)
 
 1. `make typecheck && make lint && make test` once `foundation` lands (and again as each track merges)
