@@ -148,6 +148,50 @@ Final stack at a glance:
      guardrails (prompt-injection defense, input limits); quality (the eval matrix + thresholds
      from unit 09); observability (what the traces capture and why). Do NOT let an LLM draft this. -->
 
+### Quality controls
+
+Retrieval and answer quality are measured, not vibed — using the standard evaluators from
+LlamaIndex core and DeepEval over a hand-curated golden set (`evals/golden_set.json`: Q&A pairs
+over the sample corpus, with reference answers and expected source documents). Run with
+`make eval`, which fetches the corpus, ingests it, runs both evaluator layers, and prints a
+per-question × per-metric table.
+
+**Layer 1 — LlamaIndex core** (judge = the configured OpenAI model), via `BatchEvalRunner`:
+
+| Metric | What it checks | Threshold |
+|---|---|---|
+| Faithfulness | answer grounded in retrieved context (no hallucination) | ≥ 0.80 |
+| Relevancy | answer + context relevant to the query | ≥ 0.70 |
+| AnswerRelevancy | answer addresses the question | ≥ 0.70 |
+| ContextRelevancy | retrieved chunks relevant to the query | ≥ 0.60 |
+| Correctness | answer vs golden reference (1–5, normalized /5) | ≥ 0.70 |
+| SemanticSimilarity | embedding similarity to reference (local FastEmbed, no judge cost) | ≥ 0.70 |
+| Guideline: citation | every claim carries a citation or refuses | ≥ 0.50 |
+| Guideline: refusal | declines when context is insufficient | ≥ 0.50 |
+| hit_rate | golden query → expected source retrieved | ≥ 0.70 |
+| mrr | rank of the first correct source | ≥ 0.60 |
+
+**Layer 2 — DeepEval** (local mode, same OpenAI judge): Faithfulness ≥ 0.80, AnswerRelevancy
+≥ 0.70, TaskCompletion ≥ 0.70 — an independent second opinion on the two most important
+qualities plus did-it-complete-the-ask.
+
+LlamaIndex and DeepEval faithfulness are reported side by side; large disagreements (|Δ| ≥ 0.3)
+are surfaced per question rather than averaged away. Refusal behavior is checked explicitly:
+unanswerable questions must score as refusals, not answers. Evals are **not** CI-gated (they
+cost tokens) — they run on demand.
+
+Skipped by design: `PairwiseComparisonEvaluator` (needs two systems to compare — useful later
+for prompt A/B), multi-modal and benchmark suites (out of scope).
+
+### Guardrails
+
+The system prompt answers only from retrieved context, fences document excerpts as untrusted
+data between explicit markers (prompt-injection defense), and refuses to disclose its prompt or
+change persona — the user question is treated as untrusted too. Input limits are enforced
+server-side: question-length cap (`413`), empty message (`422`), and the upload size cap from the
+upload API. The chat endpoint is rate-limited (in-process sliding window, designed `429` +
+`Retry-After`). The prompt-injection test suite lives in `api/tests/test_injection.py`.
+
 ## 5. Key technical decisions
 
 > The non-RAG engineering decisions. Factual list below; **hand-write the reasoning** for the
