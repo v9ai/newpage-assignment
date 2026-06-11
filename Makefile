@@ -1,4 +1,4 @@
-.PHONY: typecheck lint test dev fetch-samples
+.PHONY: typecheck lint test dev fetch-samples eval e2e
 
 # Example ingestion corpus: architecture docs from github.com/v9ai/agentic-sales.
 # Cloned shallow into samples/ (gitignored) — never vendored into this repo.
@@ -25,6 +25,17 @@ dev:
 
 migrate:
 	cd api && uv run alembic upgrade head
+
+# RAG quality evals over the golden set (costs OpenAI tokens; run on demand).
+# Needs the compose stack up. Fetches the sample corpus itself if absent.
+eval:
+	cd api && uv run python ../evals/run_evals.py
+
+# End-to-end: drives the running compose stack with Playwright.
+# Requires `docker compose up` first; installs the browser on first run.
+e2e:
+	cd api && uv run playwright install --with-deps chromium
+	cd api && uv run pytest ../e2e -q
 
 # Re-record the README demo (requires the stack: docker compose up)
 video:
