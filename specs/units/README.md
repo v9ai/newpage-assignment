@@ -60,8 +60,9 @@ Loaded by pydantic-settings from `.env` (defaults) then `.env.local` (overrides,
 ### Postgres schema
 - `documents(id uuid pk, filename, size, mime, status, failure_reason nullable, created_at)`
   — `status`: `uploaded → ingesting → ready | failed` (failed always sets `failure_reason`)
-- `chat_sessions(id uuid pk, title, created_at)`
-- `chat_messages(id uuid pk, session_id fk, role, content, citations jsonb, created_at)`
+- `chat_sessions(id int pk, title, created_at)`
+- `chat_messages(id int pk, session_id fk, role, content, citations jsonb, created_at)`
+  (int pks to match `documents` — implemented in migration `0003`)
 
 ### Qdrant
 Collection `QDRANT_COLLECTION`, 384-dim cosine vectors; point payload:
