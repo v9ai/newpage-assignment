@@ -3,14 +3,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
-from pydantic import BaseModel, ConfigDict
+import structlog
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_session
 from app.models import Document
+
+log = structlog.get_logger()
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -27,20 +30,23 @@ class DocumentOut(BaseModel):
     id: int
     filename: str
     status: str
-    size_bytes: int
+    size: int = Field(validation_alias="size_bytes")
     mime: str
-    error: str | None
+    failure_reason: str | None = Field(validation_alias="error")
     created_at: datetime
 
 
-def stored_path(doc: Document) -> Path:
-    ext = Path(doc.filename).suffix.lower()
-    return Path(get_settings().upload_dir) / f"{doc.id}{ext}"
+def stored_path(doc_id: int, filename: str) -> Path:
+    """On-disk location of an uploaded file: `<upload_dir>/<id><ext>`."""
+    ext = Path(filename).suffix.lower()
+    return Path(get_settings().upload_dir) / f"{doc_id}{ext}"
 
 
 @router.post("", status_code=201, response_model=DocumentOut)
 def upload_document(
-    file: UploadFile, session: Annotated[Session, Depends(get_session)]
+    file: UploadFile,
+    background: BackgroundTasks,
+    session: Annotated[Session, Depends(get_session)],
 ) -> Document:
     settings = get_settings()
     filename = file.filename or ""
@@ -67,11 +73,17 @@ def upload_document(
     session.commit()
     session.refresh(doc)
 
-    dest = stored_path(doc)
+    dest = stored_path(doc.id, doc.filename)
     dest.parent.mkdir(parents=True, exist_ok=True)
     with dest.open("wb") as out:
         shutil.copyfileobj(file.file, out)
 
+    # Run the full ingestion pipeline (parse -> chunk -> embed -> Qdrant) in the
+    # background so the upload response returns immediately. Ingestion drives the
+    # uploaded -> ingesting -> ready | failed transitions and captures failures.
+    from app.ingestion import ingest_document
+
+    background.add_task(ingest_document, doc.id)
     return doc
 
 
@@ -85,6 +97,14 @@ def delete_document(doc_id: int, session: Annotated[Session, Depends(get_session
     doc = session.get(Document, doc_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found.")
-    stored_path(doc).unlink(missing_ok=True)
+    stored_path(doc.id, doc.filename).unlink(missing_ok=True)
     session.delete(doc)
     session.commit()
+
+    # Drop the document's chunk vectors too, so search never returns dead hits.
+    try:
+        from app.ingestion import delete_doc_vectors
+
+        delete_doc_vectors(str(doc_id))
+    except Exception:
+        log.warning("vector_cleanup_failed", doc_id=doc_id)

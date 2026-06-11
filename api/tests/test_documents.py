@@ -25,6 +25,14 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
         with Session(engine) as session:
             yield session
 
+    # Background ingestion (triggered on upload) must hit the same test engine.
+    monkeypatch.setattr("app.ingestion.get_engine", lambda: engine)
+    # These tests cover the HTTP/validation layer, not the embedding+Qdrant
+    # pipeline, so stub the embed/store steps: parse still runs (so corrupt
+    # files are detected), but no vector store is required.
+    monkeypatch.setattr("app.ingestion.ensure_collection", lambda: None)
+    monkeypatch.setattr("app.ingestion.delete_doc_vectors", lambda doc_id: None)
+    monkeypatch.setattr("app.ingestion._upsert_chunks", lambda doc_id, fn, chunks: len(chunks))
     app.dependency_overrides[get_session] = override
     with TestClient(app) as c:
         yield c
@@ -40,10 +48,13 @@ def test_upload_list_delete_roundtrip(client: TestClient) -> None:
     doc = res.json()
     assert doc["filename"] == "notes.md"
     assert doc["status"] == "uploaded"
-    assert doc["size_bytes"] == len(b"# hello docchat")
+    assert doc["size"] == len(b"# hello docchat")
 
+    # TestClient runs the background ingestion task before returning, so by the
+    # time we list, status has progressed past "uploaded".
     listed = client.get("/api/documents").json()
     assert [d["id"] for d in listed] == [doc["id"]]
+    assert listed[0]["status"] == "ready"
 
     assert client.delete(f"/api/documents/{doc['id']}").status_code == 204
     assert client.get("/api/documents").json() == []
@@ -66,3 +77,14 @@ def test_oversize_rejected(client: TestClient, monkeypatch) -> None:
 
 def test_delete_missing_404(client: TestClient) -> None:
     assert client.delete("/api/documents/999").status_code == 404
+
+
+def test_corrupt_pdf_marked_failed_with_reason(client: TestClient) -> None:
+    res = client.post(
+        "/api/documents", files={"file": ("bad.pdf", b"not a pdf at all", "application/pdf")}
+    )
+    assert res.status_code == 201
+    # TestClient runs background tasks before returning, so status is final
+    doc = client.get("/api/documents").json()[0]
+    assert doc["status"] == "failed"
+    assert doc["failure_reason"]
