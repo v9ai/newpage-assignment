@@ -56,7 +56,7 @@ def _require_stack(api_base_url: str) -> None:
 def _require_chat(api_base_url: str) -> None:
     """Skip the chat path until the sessions router is mounted (units 07/08)."""
     try:
-        r = httpx.post(f"{api_base_url}/api/sessions", timeout=5)
+        r = httpx.post(f"{api_base_url}/api/sessions", json={}, timeout=5)
     except httpx.HTTPError:
         pytest.skip("compose stack not reachable")
     if r.status_code == 404:
@@ -84,7 +84,7 @@ def _upload_and_ingest(api_base_url: str) -> int:
 
 def _ask_and_collect(api_base_url: str, question: str) -> tuple[str, list[dict]]:
     """Drive one chat turn over SSE; return (answer_text, citations)."""
-    session = httpx.post(f"{api_base_url}/api/sessions", timeout=10).json()
+    session = httpx.post(f"{api_base_url}/api/sessions", json={}, timeout=10).json()
     session_id = session["id"]
 
     answer_parts: list[str] = []
