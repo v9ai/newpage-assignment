@@ -4,12 +4,16 @@ Measures retrieval and answer quality with the standard evaluators from
 LlamaIndex core and DeepEval rather than a hand-rolled scorer, over the curated
 golden set in golden_set.json against the sample corpus.
 
-Run via `make eval` (which fetches samples first). Standalone:
+Run via `make eval`. Standalone:
     cd api && uv run python ../evals/run_evals.py [--limit N] [--no-deepeval]
 
-The harness is self-contained: it ingests samples/docs into a throwaway Qdrant
-collection using the same FastEmbed model the app uses, so it does not depend on
-the unit-06 ingestion service being up — only Qdrant and an OpenAI key.
+The sample corpus is fetched by the `make fetch-samples` target (one fetch path
+for the whole project); this harness only checks samples/docs/ is populated and
+tells you to run that target if it is empty — it does not clone anything itself.
+
+The harness is otherwise self-contained: it ingests samples/docs into a throwaway
+Qdrant collection using the same FastEmbed model the app uses, so it does not
+depend on the unit-06 ingestion service being up — only Qdrant and an OpenAI key.
 
 Layers:
   1. LlamaIndex core (judge = configured OpenAI model) via BatchEvalRunner:
@@ -451,13 +455,12 @@ def main() -> int:
     args = parser.parse_args()
 
     sys.path.insert(0, str(REPO_ROOT / "api"))
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-    from fetch_samples import fetch  # type: ignore[import-not-found]
-
-    fetch()
     if not list(SAMPLES_DIR.glob("*.md")):
-        print("no sample docs available; aborting", file=sys.stderr)
+        print(
+            f"no sample docs in {SAMPLES_DIR}. Run `make fetch-samples` first.",
+            file=sys.stderr,
+        )
         return 1
 
     _configure_llama_settings()
