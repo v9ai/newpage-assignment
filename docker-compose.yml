@@ -1,0 +1,48 @@
+services:
+  web:
+    build: ./web
+    ports:
+      - "3000:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    build: ./api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.local
+    environment:
+      DATABASE_URL: postgresql+psycopg://docchat:docchat@postgres:5432/docchat
+      QDRANT_URL: http://qdrant:6333
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+
+  postgres:
+    image: postgres:16.14-alpine
+    environment:
+      POSTGRES_USER: docchat
+      POSTGRES_PASSWORD: docchat
+      POSTGRES_DB: docchat
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docchat -d docchat"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.18.2
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    # The qdrant image ships no curl/wget; the api health endpoint proves
+    # qdrant connectivity end-to-end instead.
+
+volumes:
+  pgdata:
+  qdrant_storage:
