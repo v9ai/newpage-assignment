@@ -1,0 +1,79 @@
+{
+  "_about": "Hand-curated golden Q&A over the agentic-sales/Scrapus sample corpus. Bootstrapped with LlamaIndex RagDatasetGenerator, then edited by hand: reference answers tightened to the source text, expected_sources set to the doc(s) that actually contain the answer, and an unanswerable set added to exercise the refusal path. expected_sources are filenames (matching the Qdrant payload `filename`); use [] for unanswerable questions.",
+  "answerable": [
+    {
+      "id": "a1",
+      "question": "What data stores does the Scrapus system use?",
+      "reference_answer": "Scrapus is backed by SQLite, LanceDB, and ChromaDB, with no cloud infrastructure required beyond optional OpenAI API access.",
+      "expected_sources": ["00-system-architecture.md"]
+    },
+    {
+      "id": "a2",
+      "question": "Which algorithm does the lead-matching module use for lead classification?",
+      "reference_answer": "The lead-matching module uses XGBoost as the primary classifier for lead classification.",
+      "expected_sources": ["04-lead-matching.md"]
+    },
+    {
+      "id": "a3",
+      "question": "What approach does the entity resolution module use for matching?",
+      "reference_answer": "Entity resolution uses a two-stage hybrid approach: rule-based blocking (canopy clustering) followed by deep matching with Siamese neural networks over LanceDB, using cosine distance for similarity.",
+      "expected_sources": ["03-entity-resolution.md"]
+    },
+    {
+      "id": "a4",
+      "question": "How does the crawler decide which URLs to visit?",
+      "reference_answer": "The crawler uses reinforcement learning — Deep Q-Networks (DQN) for URL selection — together with multi-armed bandit domain scheduling.",
+      "expected_sources": ["01-crawler.md"]
+    },
+    {
+      "id": "a5",
+      "question": "What entity extraction F1 score does Scrapus report?",
+      "reference_answer": "Scrapus reports an entity (NER) F1 of about 92.3%, compared with roughly 85% for off-the-shelf and 77% for ETAP.",
+      "expected_sources": ["06-evaluation.md"]
+    },
+    {
+      "id": "a6",
+      "question": "How much memory does the BERT NER model use?",
+      "reference_answer": "The BERT NER model uses about 440 MB and stays resident from pipeline start.",
+      "expected_sources": ["00-system-architecture.md"]
+    },
+    {
+      "id": "a7",
+      "question": "What is the primary trade-off of the local-first architecture versus cloud-native?",
+      "reference_answer": "Local-first keeps data on the machine (privacy) with no network round-trips for inference (low latency) and full offline capability, but is bounded by a single-machine scalability ceiling and puts the ops burden (backups, updates) on the user.",
+      "expected_sources": ["00-system-architecture.md"]
+    },
+    {
+      "id": "a8",
+      "question": "What is the main security concern the threat model focuses on?",
+      "reference_answer": "The threat model focuses on threats unique to an LLM application, particularly prompt injection, and favors layered defenses such as fencing at the model level rather than a single regex.",
+      "expected_sources": ["THREAT-MODEL.md"]
+    },
+    {
+      "id": "a9",
+      "question": "What does Module 5 of the pipeline do?",
+      "reference_answer": "Module 5 handles report generation, using an LLM to summarize the pipeline's findings into a structured report.",
+      "expected_sources": ["05-report-generation.md"]
+    }
+  ],
+  "unanswerable": [
+    {
+      "id": "u1",
+      "question": "What is the monthly pricing of the Scrapus enterprise SaaS plan?",
+      "reference_answer": "I couldn't find anything about that in the uploaded documents.",
+      "expected_sources": []
+    },
+    {
+      "id": "u2",
+      "question": "Who is the current CEO of the company that builds Scrapus?",
+      "reference_answer": "I couldn't find anything about that in the uploaded documents.",
+      "expected_sources": []
+    },
+    {
+      "id": "u3",
+      "question": "What is the capital city of France?",
+      "reference_answer": "I couldn't find anything about that in the uploaded documents.",
+      "expected_sources": []
+    }
+  ]
+}
