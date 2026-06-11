@@ -76,13 +76,12 @@ def test_empty_message_is_clean_422(api_base_url: str) -> None:
 
 @pytest.mark.usefixtures("_require_stack", "_require_chat")
 def test_unknown_session_is_clean_404(api_base_url: str) -> None:
-    """Posting to a non-existent session should be a clean 404.
+    """Posting to a non-existent session is a clean 404.
 
-    Currently xfails: the live chat endpoint resolves `get_persistence` to the
-    in-memory stub (which auto-creates any session id) because unit 08's
-    DbChatPersistence is not yet wired via `app.dependency_overrides` in main.py.
-    Once that override lands, `add_user_message` raises KeyError for an unknown
-    session and chat.py returns the 404 this asserts — flip from xfail to pass.
+    DbChatPersistence is wired into `get_persistence` in main.py, so
+    `add_user_message` raises KeyError for an unknown session and chat.py
+    returns 404. Xfails only against a stale pre-wiring image — rebuild
+    (`docker compose up --build`) to get the pass.
     """
     r = httpx.post(
         f"{api_base_url}/api/sessions/9876543/messages",
@@ -91,8 +90,8 @@ def test_unknown_session_is_clean_404(api_base_url: str) -> None:
     )
     if r.status_code != 404:
         pytest.xfail(
-            "DbChatPersistence not wired into get_persistence yet "
-            "(unit 08 dependency_override pending) — chat uses the in-memory stub"
+            "api container predates the DbChatPersistence wiring in main.py — "
+            "rebuild the stack"
         )
     assert r.json().get("detail")
 

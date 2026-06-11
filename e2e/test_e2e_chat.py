@@ -16,10 +16,12 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import time
 
 import httpx
 import pytest
+from playwright.sync_api import expect
 
 # The sample fact must be specific enough that a grounded answer is unambiguous
 # and a refusal (no citations) would be obviously wrong.
@@ -122,13 +124,72 @@ def test_upload_ingest_ask_cited_answer(api_base_url: str) -> None:
 
 @pytest.mark.usefixtures("_require_stack")
 def test_landing_page_loads_in_browser(web_base_url: str, page) -> None:  # type: ignore[no-untyped-def]
-    """The SPA loads and shows live service health — smoke check of the web tier.
-
-    The deep chat-UI walkthrough (typing a question, seeing the streamed cited
-    answer in the DOM) is added once unit 08's chat UI lands and its selectors
-    are confirmed; the cited-answer guarantee itself is covered API-side above.
-    """
+    """The SPA loads and shows live service health — smoke check of the web tier."""
     page.goto(web_base_url)
     # Brand is present and the health badge resolved to a non-error state.
     page.wait_for_load_state("networkidle")
     assert "DocChat" in page.content()
+
+
+@pytest.mark.usefixtures("_require_stack", "_require_chat")
+def test_chat_ui_streams_cited_answer(api_base_url: str, web_base_url: str, page) -> None:  # type: ignore[no-untyped-def]
+    """The unit-08 browser walkthrough: type a question in the composer, watch
+    the grounded answer stream into the DOM, then open a citation's source
+    preview and confirm it shows the exact fixture passage."""
+    _upload_and_ingest(api_base_url)
+
+    page.goto(web_base_url)
+    chat_panel = page.get_by_role("region", name="Chat")
+    composer = chat_panel.get_by_label("Message", exact=True)
+    # The composer unblocks once the document list confirms an upload exists.
+    expect(composer).to_be_enabled(timeout=15_000)
+    composer.fill(QUESTION)
+    composer.press("Enter")
+
+    # The user bubble renders immediately. Use .first: a persisted prior turn
+    # with the same question (DB history is restored on load) can make the text
+    # match more than once, which would trip Playwright's strict mode.
+    expect(chat_panel.get_by_text(QUESTION).first).to_be_visible()
+
+    # Citation chips appear only after the stream's `citations` event, so their
+    # arrival means the turn finished AND was grounded. Generous timeout: the
+    # answer comes from the live LLM.
+    chip = chat_panel.get_by_role(
+        "button", name=re.compile(re.escape(SAMPLE_FILENAME))
+    ).first
+    expect(chip).to_be_visible(timeout=120_000)
+    expect(
+        chat_panel.get_by_text(re.compile(EXPECTED_SUBSTRING, re.IGNORECASE)).first
+    ).to_be_visible()
+
+    # Chip click -> source preview slide-over with the fixture passage.
+    chip.click()
+    dialog = page.get_by_role("dialog")
+    expect(dialog).to_be_visible()
+    expect(dialog).to_contain_text(SAMPLE_FILENAME)
+    expect(dialog).to_contain_text(re.compile("lighthouse", re.IGNORECASE))
+    page.keyboard.press("Escape")
+    expect(dialog).not_to_be_visible()
+
+
+@pytest.mark.usefixtures("_require_stack", "_require_chat")
+def test_reload_restores_session_and_messages(api_base_url: str, web_base_url: str, page) -> None:  # type: ignore[no-untyped-def]
+    """Unit-08 done-when: conversations survive reloads. Drive a turn through
+    the API (persisting it server-side), then load the UI fresh and expect the
+    most recent session's messages — citations included — to be restored."""
+    _upload_and_ingest(api_base_url)
+    question = "When was Project Lighthouse approved?"
+    answer, citations = _ask_and_collect(api_base_url, question)
+    assert answer, "the API turn produced no answer to restore"
+
+    page.goto(web_base_url)
+    chat_panel = page.get_by_role("region", name="Chat")
+    # The newest session is auto-selected; both turns are restored from the DB.
+    expect(chat_panel.get_by_text(question)).to_be_visible(timeout=15_000)
+    if citations:
+        # Persisted citations re-render as chips on the restored answer.
+        expect(
+            chat_panel.get_by_role(
+                "button", name=re.compile(re.escape(SAMPLE_FILENAME))
+            ).first
+        ).to_be_visible()
