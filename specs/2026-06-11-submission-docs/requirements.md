@@ -3,7 +3,7 @@
 ## Scope
 
 Every documentation deliverable from the brief's "What to Submit", specified section by
-section so nothing is improvised at the end. Executed by unit 20, but the content
+section so nothing is improvised at the end. Executed by unit 10, but the content
 requirements live here.
 
 ## The README (root `README.md`)

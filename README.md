@@ -29,7 +29,7 @@ Want a demo corpus? `make fetch-samples` pulls 28 architecture docs into `sample
 
 ## Status
 
-Spec-driven build in progress — see [`specs/`](specs/) for the roadmap and the 20 build units.
+Spec-driven build in progress — see [`specs/`](specs/) for the roadmap and the 10 build units.
 
 | Section | Status |
 |---|---|

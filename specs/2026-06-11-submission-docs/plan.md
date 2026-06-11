@@ -1,19 +1,19 @@
 # Submission Docs Plan
 
 ## Group 1 — Skeleton early (don't leave docs for the end)
-1. README stub with setup path exists from Phase 1 (already required by unit 06/16)
+1. README stub with setup path exists from Phase 1 (already required by units 04/10)
 2. Add empty-but-titled sections for all 9 requirement areas so gaps stay visible
 3. `docs/screenshots/` directory placeholder
 
 ## Group 2 — Write alongside the build
 4. After each phase merges, update the matching README section while decisions are fresh
-   (chunking choice when unit 10 lands, eval table when unit 17 lands, …)
+   (chunking choice when unit 06 lands, eval table when unit 09 lands, …)
 5. Keep a running `docs/decisions.md` scratchpad of choices-considered → final → why;
    it becomes section 4/5 raw material
 
 ## Group 3 — Capture
-6. Screenshots after unit 15 (chat UI) is polished: the 5 shots listed in requirements
-7. Optional ≤2 min video after unit 19 (everything stable)
+6. Screenshots after unit 08 (chat UI) is polished: the 5 shots listed in requirements
+7. Optional ≤2 min video after unit 10's hardening pass (everything stable)
 
 ## Group 4 — Hand-written pass
 8. Author writes sections 4–8 personally (per the authorship note), using the scratchpad —

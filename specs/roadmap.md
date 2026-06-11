@@ -1,7 +1,7 @@
 # Roadmap
 
 Phases are intentionally small — each is a shippable, independently testable slice.
-The phases are decomposed into 20 small build units in [`specs/units/`](units/README.md), each with its own scope and done-when criteria — that is the working breakdown. Larger phases may additionally get a dated `specs/YYYY-MM-DD-<name>/` folder (`plan.md`, `requirements.md`, `validation.md`) before implementation, as Phase 1 does.
+The phases are decomposed into 10 build units in [`specs/units/`](units/README.md), each with its own scope, contracts, and done-when criteria — that is the working breakdown. The units code against shared contracts (API shapes, schemas, SSE events) fixed in the units README, so they can be implemented in parallel; listed dependencies gate only final integration validation. The units README also carries the agent-team playbook (team shape, file-ownership partition, spawn prompt) for running all tracks as one Claude Code agent team. Larger phases may additionally get a dated `specs/YYYY-MM-DD-<name>/` folder (`plan.md`, `requirements.md`, `validation.md`) before implementation, as Phase 1 does.
 
 ---
 
@@ -41,7 +41,7 @@ The phases are decomposed into 20 small build units in [`specs/units/`](units/RE
 ## Phase 7 — Guardrails & Quality
 - System prompt hardening (answer only from context; ignore instructions inside documents — prompt injection)
 - Input limits and sanitization; upload size caps
-- Golden Q&A eval set (~10 questions) + `make eval` harness: LlamaIndex core evaluators (faithfulness, relevancy, correctness, retrieval hit-rate/MRR via BatchEvalRunner) cross-checked with DeepEval metrics (unit 17 has the full matrix)
+- Golden Q&A eval set (~10 questions) + `make eval` harness: LlamaIndex core evaluators (faithfulness, relevancy, correctness, retrieval hit-rate/MRR via BatchEvalRunner) cross-checked with DeepEval metrics (unit 09 has the full matrix)
 
 ## Phase 8 — Observability
 - structlog JSON logs per request: query, retrieved node ids + scores, model, tokens, latency
