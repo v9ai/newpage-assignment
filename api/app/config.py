@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     upload_dir: str = "./data/uploads"
     max_upload_mb: int = 25
 
+    chunk_size: int = 512
+    chunk_overlap: int = 64
+
+    retrieval_top_k: int = 5
+    retrieval_score_threshold: float = 0.3
+
+    chat_token_budget: int = 6000
+
 
 @lru_cache
 def get_settings() -> Settings:
