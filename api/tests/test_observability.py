@@ -18,7 +18,6 @@ from app.logging import _OPENAI_KEY_RE, redact_secrets
 from app.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
 from app.ratelimit import SlidingWindowLimiter, enforce_chat_rate_limit
 
-
 # --- logging: redaction ---------------------------------------------------
 
 
